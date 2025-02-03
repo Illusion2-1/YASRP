@@ -32,20 +32,29 @@ public class AppConfigurationProvider : IConfigurationProvider {
         CheckConfigPresence();
     }
 
-    public AppConfiguration LoadConfiguration() {
-        try {
-            if (!File.Exists(_configPath)) {
+    public AppConfiguration LoadConfiguration()
+    {
+        try
+        {
+            if (!File.Exists(_configPath))
+            {
                 _logger.Warn($"Config file not found at {_configPath}, creating default configuration");
-                return CreateDefaultConfig();
+                var defaultConfig = CreateDefaultConfig();
+                LogConfigurator.SetLogLevelFromConfig(defaultConfig.Logging.Level);
+                return defaultConfig;
             }
 
             var yaml = File.ReadAllText(_configPath);
             var config = _deserializer.Deserialize<AppConfiguration>(yaml);
-
+            
             _logger.Info("Configuration loaded successfully");
+            
+            LogConfigurator.SetLogLevelFromConfig(config.Logging.Level);
+            
             return config ?? CreateDefaultConfig();
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             _logger.Error($"Failed to load configuration: {ex.Message}");
             return CreateDefaultConfig();
         }

@@ -4,43 +4,82 @@ using log4net.Appender;
 using log4net.Config;
 using log4net.Core;
 using log4net.Layout;
+using log4net.Repository;
+using YASRP.Core.Configurations.Models;
 
 namespace YASRP.Core.Configurations.Provider;
 
-public static class LogConfigurator {
-    public static void Configure() {
-        var loggerRepository = LogManager.GetRepository();
+public static class LogConfigurator
+{
+    private static ILoggerRepository? _loggerRepository;
+    private static ColoredConsoleAppender? _appender;
+
+    public static void Initialize()
+    {
+        _loggerRepository = LogManager.GetRepository();
         var layout = new PatternLayout("[%date{HH:mm:ss}] [THREAD-%thread/%level] [%logger]: %message%newline");
         layout.ActivateOptions();
 
-        var appender = new ColoredConsoleAppender {
+        _appender = new ColoredConsoleAppender
+        {
             Layout = layout
         };
 
-        appender.AddMapping(new ColoredConsoleAppender.LevelColors {
+        ConfigureLevelColors(_appender);
+        _appender.ActivateOptions();
+
+        BasicConfigurator.Configure(_loggerRepository, _appender);
+        SetLogLevel(Level.Info);
+    }
+
+    public static void SetLogLevel(Level level)
+    {
+        if (_loggerRepository != null)
+        {
+            _loggerRepository.Threshold = level;
+        }
+    }
+
+    public static void SetLogLevelFromConfig(LogLevel logLevel)
+    {
+        var level = logLevel switch
+        {
+            LogLevel.Debug => Level.Debug,
+            LogLevel.Info => Level.Info,
+            LogLevel.Warn => Level.Warn,
+            LogLevel.Error => Level.Error,
+            LogLevel.None => Level.Off,
+            _ => Level.Info
+        };
+
+        SetLogLevel(level);
+    }
+
+    private static void ConfigureLevelColors(ColoredConsoleAppender appender)
+    {
+        appender.AddMapping(new ColoredConsoleAppender.LevelColors
+        {
             Level = Level.Info,
             ForeColor = ConsoleColor.Green
         });
 
-        appender.AddMapping(new ColoredConsoleAppender.LevelColors {
+        appender.AddMapping(new ColoredConsoleAppender.LevelColors
+        {
             Level = Level.Warn,
             ForeColor = ConsoleColor.Yellow
         });
 
-        appender.AddMapping(new ColoredConsoleAppender.LevelColors {
+        appender.AddMapping(new ColoredConsoleAppender.LevelColors
+        {
             Level = Level.Error,
             ForeColor = ConsoleColor.Red
         });
 
-        appender.AddMapping(new ColoredConsoleAppender.LevelColors {
+        appender.AddMapping(new ColoredConsoleAppender.LevelColors
+        {
             Level = Level.Debug,
             ForeColor = ConsoleColor.Gray
         });
-
-        appender.ActivateOptions();
-
-        BasicConfigurator.Configure(loggerRepository, appender);
-        loggerRepository.Threshold = Level.Debug;
     }
 }
 

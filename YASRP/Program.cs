@@ -7,7 +7,7 @@ namespace YASRP;
 
 internal class Program {
     private static async Task Main(string[] args) {
-        LogConfigurator.Configure();
+        LogConfigurator.Initialize();
         var logger = LogWrapperFactory.CreateLogger(nameof(Program));
         
         logger.Info("Started.");
@@ -19,5 +19,13 @@ internal class Program {
         
         
         var serviceProvider = services.BuildServiceProvider();
+        
+        var configurationProvider = serviceProvider.GetRequiredService<IConfigurationProvider>();
+        var config = configurationProvider.LoadConfiguration();
+        
+        logger.Info("Info");
+        logger.Warn("Warn");
+        logger.Error("Error");
+        logger.Debug("Debug");
     }
 }
