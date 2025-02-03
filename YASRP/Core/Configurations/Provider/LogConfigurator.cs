@@ -5,9 +5,9 @@ using log4net.Config;
 using log4net.Core;
 using log4net.Layout;
 
-namespace YASRP.Core.Configurations;
+namespace YASRP.Core.Configurations.Provider;
 
-public class LogConfigurator {
+public static class LogConfigurator {
     public static void Configure() {
         var loggerRepository = LogManager.GetRepository();
         var layout = new PatternLayout("[%date{HH:mm:ss}] [THREAD-%thread/%level] [%logger]: %message%newline");

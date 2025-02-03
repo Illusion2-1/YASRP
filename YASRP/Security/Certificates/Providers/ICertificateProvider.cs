@@ -1,6 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 
-namespace YASRP.Core.Abstractions;
+namespace YASRP.Security.Certificates.Providers;
 
 public interface ICertificateProvider {
     X509Certificate2 GenerateRootCertificate(string commonName, DateTime notBefore, DateTime notAfter);

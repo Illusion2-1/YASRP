@@ -1,6 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 
-namespace YASRP.Core.Abstractions;
+namespace YASRP.Security.Certificates.Stores;
 
 public interface ICertificateStore {
     void StoreRootCertificate(X509Certificate2 certificate, string friendlyName);

@@ -1,19 +1,20 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography.X509Certificates;
-using System.Xml;
 using YASRP.Core.Abstractions;
 using YASRP.Core.Utilities;
 using YASRP.Diagnostics.Logging.Providers;
+using YASRP.Security.Certificates.Providers;
+using YASRP.Security.Certificates.Stores;
 
 namespace YASRP.Security.Certificates;
 
-public class CertManager(ICertificateProvider certificateProvider, ICertificateStore certificateStore) {
+public class CertManager(ICertificateProvider certificateProvider, ICertificateStore certificateStore) : ICertManager {
     private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(CertManager));
     private readonly ConcurrentDictionary<string, X509Certificate2> _certificateCache = new();
     private X509Certificate2? _rootCertificate;
     private const string RootCertName = "Yasrp Root";
 
-    public async Task InitializeAsync(string rootCertCommonName) {
+    public Task InitializeAsync(string rootCertCommonName) {
         try {
             // 尝试从存储中获取根证书
             _rootCertificate = certificateStore.GetRootCertificate(RootCertName);
@@ -37,8 +38,10 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
         }
         catch (Exception ex) {
             _logger.Error($"Failed to initialize certificate manager: {ex.Message}");
-            throw;
+            Environment.Exit(1);
         }
+
+        return Task.CompletedTask;
     }
 
     public X509Certificate2 GetOrCreateSiteCertificate(string domains) {
