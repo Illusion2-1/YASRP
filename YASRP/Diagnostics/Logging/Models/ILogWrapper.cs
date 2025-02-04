@@ -1,4 +1,4 @@
-namespace YASRP.Core.Abstractions;
+namespace YASRP.Diagnostics.Logging.Models;
 
 public interface ILogWrapper {
     void Info(string message);

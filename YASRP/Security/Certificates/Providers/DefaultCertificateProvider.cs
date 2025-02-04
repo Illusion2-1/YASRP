@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using YASRP.Core.Abstractions;
+using YASRP.Core.Configurations.Provider;
+using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 
 namespace YASRP.Security.Certificates.Providers;
@@ -73,13 +75,13 @@ public class DefaultCertificateProvider : ICertificateProvider {
     public bool ValidateDomainInCertificate(X509Certificate2 certificate, IEnumerable<string> allowedDomains) {
         var allowedDomainsSet = new HashSet<string>(allowedDomains, StringComparer.OrdinalIgnoreCase);
         foreach (var s in allowedDomainsSet) _logger.Info(s);
-        
+
         var subjectName = certificate.GetNameInfo(X509NameType.SimpleName, false);
         if (!string.IsNullOrEmpty(subjectName) && !allowedDomainsSet.Contains(subjectName)) {
             _logger.Warn($"Certificate CN {subjectName} not in allowed domains list");
             return false;
         }
-        
+
         var sanExtension = certificate.Extensions
             .FirstOrDefault(ext => ext.Oid?.Value == "2.5.29.17");
 

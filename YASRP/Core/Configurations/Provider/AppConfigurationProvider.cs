@@ -2,6 +2,7 @@ using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
+using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 
 namespace YASRP.Core.Configurations.Provider;
@@ -32,12 +33,9 @@ public class AppConfigurationProvider : IConfigurationProvider {
         CheckConfigPresence();
     }
 
-    public AppConfiguration LoadConfiguration()
-    {
-        try
-        {
-            if (!File.Exists(_configPath))
-            {
+    public AppConfiguration LoadConfiguration() {
+        try {
+            if (!File.Exists(_configPath)) {
                 _logger.Warn($"Config file not found at {_configPath}, creating default configuration");
                 var defaultConfig = CreateDefaultConfig();
                 LogConfigurator.SetLogLevelFromConfig(defaultConfig.Logging.Level);
@@ -46,15 +44,14 @@ public class AppConfigurationProvider : IConfigurationProvider {
 
             var yaml = File.ReadAllText(_configPath);
             var config = _deserializer.Deserialize<AppConfiguration>(yaml);
-            
+
             _logger.Info("Configuration loaded successfully");
-            
+
             LogConfigurator.SetLogLevelFromConfig(config.Logging.Level);
-            
-            return config ?? CreateDefaultConfig();
+
+            return config;
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             _logger.Error($"Failed to load configuration: {ex.Message}");
             return CreateDefaultConfig();
         }
@@ -73,7 +70,7 @@ public class AppConfigurationProvider : IConfigurationProvider {
 
     private AppConfiguration CreateDefaultConfig() {
         var defaultConfig = new AppConfiguration();
-        SaveConfiguration(defaultConfig); // Auto-save default config
+        SaveConfiguration(defaultConfig);
         return defaultConfig;
     }
 

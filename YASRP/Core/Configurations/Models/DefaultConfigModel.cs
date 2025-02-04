@@ -14,24 +14,29 @@ public enum LogLevel {
 }
 
 public class AppConfiguration {
-    public List<string> TargetDomains { get; set; } = new();
+    public List<string> TargetDomains { get; init; } = new();
 
-    public DnsSettings Dns { get; set; } = new();
-    public IpSelectionSettings IpSelection { get; set; } = new();
-    public LoggingSettings Logging { get; set; } = new();
+    public DnsSettings Dns { get; init; } = new();
+    public IpSelectionSettings IpSelection { get; init; } = new();
+    public LoggingSettings Logging { get; init; } = new();
 
     public class DnsSettings {
-        public string PrimaryDohServer { get; set; } = "https://1.1.1.1/dns-query";
-        public string FallbackDohServer { get; set; } = "https://dns.google/dns-query";
-        public string PlainDnsServer { get; set; } = "1.1.1.1";
+        public string PrimaryDohServer { get; init; } = "https://9.9.9.9/dns-query";
+
+        public List<string> FallbackDohServers { get; init; } =
+            ["https://1.1.1.1/dns-query", "https://101.101.101.101/dns-query", "https://208.67.222.222/dns-query", "https://223.5.5.5/dns-query"];
+
+        public string PlainDnsServer { get; init; } = "1.1.1.1";
+        public int MaxCacheSize { get; init; } = 1000;
+        public int CleanupIntervalMinutes { get; set; } = 5;
     }
 
     public class IpSelectionSettings {
-        public DnsSelectionStrategy Strategy { get; set; } = DnsSelectionStrategy.FastestHandshake;
-        public int CacheDurationMinutes { get; set; } = 30;
+        public DnsSelectionStrategy Strategy { get; init; } = DnsSelectionStrategy.FastestHandshake;
+        public int CacheDurationMinutes { get; init; } = 30;
     }
 
     public class LoggingSettings {
-        public LogLevel Level { get; set; } = LogLevel.Info;
+        public LogLevel Level { get; init; } = LogLevel.Debug;
     }
 }
