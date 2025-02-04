@@ -13,6 +13,8 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DoHResolver));
     private readonly ConcurrentDictionary<string, DnsCacheItem> _cache;
     private readonly LinkedList<string> _lruOrder = new();
+    private CancellationTokenSource _debounceCts = new();
+    private readonly TimeSpan _debounceInterval = TimeSpan.FromMilliseconds(50);
     private readonly object _syncRoot = new();
     private readonly int _maxSize;
     private readonly Timer _cleanupTimer;
@@ -28,27 +30,33 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
 
     public bool TryGet(string domain, out DnsRecord record) {
         if (_cache.TryGetValue(domain, out var item) && !item.IsExpired()) {
-            UpdateLruPosition(domain);
+            lock (_syncRoot) {
+                _lruOrder.Remove(item.LruNode);
+                _lruOrder.AddFirst(item.LruNode);
+            }
             record = item.Record;
             return true;
         }
-
         record = null;
         return false;
     }
 
     public void AddOrUpdate(string domain, DnsRecord record) {
-        var newItem = new DnsCacheItem(record);
-        _cache.AddOrUpdate(domain, newItem, (_, _) => newItem);
-        UpdateLruPosition(domain);
-        EnforceSizeLimit();
-    }
+        var node = new LinkedListNode<string>(domain);
+        var newItem = new DnsCacheItem(record, node);
+        
+        _cache.AddOrUpdate(domain, newItem, (_, existing) => {
+            lock (_syncRoot) {
+                _lruOrder.Remove(existing.LruNode);
+            }
+            return newItem;
+        });
 
-    private void UpdateLruPosition(string domain) {
         lock (_syncRoot) {
-            _lruOrder.Remove(domain);
-            _lruOrder.AddFirst(domain);
+            _lruOrder.AddFirst(node);
         }
+
+        ScheduleSizeCheck();
     }
 
     private void EnforceSizeLimit() {
@@ -64,10 +72,12 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     private void Cleanup() {
         var expiredKeys = _cache.Where(kv => kv.Value.IsExpired())
             .Select(kv => kv.Key).ToList();
+        
         foreach (var key in expiredKeys) {
-            _cache.TryRemove(key, out _);
-            lock (_syncRoot) {
-                _lruOrder.Remove(key);
+            if (_cache.TryRemove(key, out var item)) {
+                lock (_syncRoot) {
+                    _lruOrder.Remove(item.LruNode);
+                }
             }
         }
 
@@ -75,14 +85,24 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     }
 
     public void Persist() {
-        var validRecords = _cache.Where(kv => !kv.Value.IsExpired())
+        // 仅持久化有效记录，排除 LruNode 字段
+        var validRecords = _cache
+            .Where(kv => !kv.Value.IsExpired())
             .ToDictionary(kv => kv.Key, kv => kv.Value.Record);
-        File.WriteAllText(_persistPath, JsonSerializer.Serialize(validRecords));
+
+        try {
+            var json = JsonSerializer.Serialize(validRecords);
+            File.WriteAllText(_persistPath, json);
+        } catch (Exception ex) {
+            _logger.Error($"Failed to persist DNS cache: {ex.Message}");
+        }
     }
 
     private ConcurrentDictionary<string, DnsCacheItem> LoadPersistedCache() {
         try {
-            if (!File.Exists(_persistPath)) return new ConcurrentDictionary<string, DnsCacheItem>();
+            if (!File.Exists(_persistPath)) {
+                return new ConcurrentDictionary<string, DnsCacheItem>();
+            }
 
             var options = new JsonSerializerOptions {
                 PropertyNameCaseInsensitive = true,
@@ -92,12 +112,18 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             var json = File.ReadAllText(_persistPath);
             var records = JsonSerializer.Deserialize<Dictionary<string, DnsRecord>>(json, options);
 
-            return new ConcurrentDictionary<string, DnsCacheItem>(records?
-                                                                      .Where(r => new DnsCacheItem(r.Value).IsExpired() == false)
-                                                                      .ToDictionary(r => r.Key, r => new DnsCacheItem(r.Value))
-                                                                  ?? new Dictionary<string, DnsCacheItem>());
-        }
-        catch (Exception ex) {
+            var cache = new ConcurrentDictionary<string, DnsCacheItem>();
+            if (records != null) {
+                foreach (var kv in records) {
+                    var node = new LinkedListNode<string>(kv.Key);
+                    var item = new DnsCacheItem(kv.Value, node);
+                    cache.TryAdd(kv.Key, item);
+                    _lruOrder.AddFirst(node);
+                }
+            }
+
+            return cache;
+        } catch (Exception ex) {
             _logger.Error($"Failed to load DNS cache: {ex.Message}");
             return new ConcurrentDictionary<string, DnsCacheItem>();
         }
@@ -107,18 +133,30 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     public void Dispose() {
         _cleanupTimer?.Dispose();
     }
+    
+    private async void ScheduleSizeCheck() {
+        try {
+            _debounceCts.Cancel();
+            _debounceCts = new CancellationTokenSource();
+        
+            await Task.Delay(_debounceInterval, _debounceCts.Token);
+            EnforceSizeLimit();
+        } catch (TaskCanceledException) {
+            // ignored
+        }
+    }
 }
 
 public class DnsCacheItem {
     public DnsRecord Record { get; }
     public DateTime ExpiryTime { get; }
+    public LinkedListNode<string> LruNode { get; }
 
-    public DnsCacheItem(DnsRecord record) {
+    public DnsCacheItem(DnsRecord record, LinkedListNode<string> node) {
         Record = record;
         ExpiryTime = record.ExpiresAt;
+        LruNode = node;
     }
 
-    public bool IsExpired() {
-        return DateTime.UtcNow >= ExpiryTime;
-    }
+    public bool IsExpired() => DateTime.UtcNow >= ExpiryTime;
 }
