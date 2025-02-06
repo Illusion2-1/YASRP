@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using YASRP.Core.Configurations.Models;
-using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 using YASRP.Network.Dns.DoH;
@@ -37,7 +36,7 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             record = item.Record;
             return true;
         }
-        record = null;
+        record = null!;
         return false;
     }
 
@@ -74,10 +73,9 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             .Select(kv => kv.Key).ToList();
         
         foreach (var key in expiredKeys) {
-            if (_cache.TryRemove(key, out var item)) {
-                lock (_syncRoot) {
-                    _lruOrder.Remove(item.LruNode);
-                }
+            if (!_cache.TryRemove(key, out var item)) continue;
+            lock (_syncRoot) {
+                _lruOrder.Remove(item.LruNode);
             }
         }
 
@@ -113,13 +111,12 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             var records = JsonSerializer.Deserialize<Dictionary<string, DnsRecord>>(json, options);
 
             var cache = new ConcurrentDictionary<string, DnsCacheItem>();
-            if (records != null) {
-                foreach (var kv in records) {
-                    var node = new LinkedListNode<string>(kv.Key);
-                    var item = new DnsCacheItem(kv.Value, node);
-                    cache.TryAdd(kv.Key, item);
-                    _lruOrder.AddFirst(node);
-                }
+            if (records == null) return cache;
+            foreach (var kv in records) {
+                var node = new LinkedListNode<string>(kv.Key);
+                var item = new DnsCacheItem(kv.Value, node);
+                cache.TryAdd(kv.Key, item);
+                _lruOrder.AddFirst(node);
             }
 
             return cache;
@@ -131,12 +128,12 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
 
 
     public void Dispose() {
-        _cleanupTimer?.Dispose();
+        _cleanupTimer.Dispose();
     }
     
     private async void ScheduleSizeCheck() {
         try {
-            _debounceCts.Cancel();
+            await _debounceCts.CancelAsync();
             _debounceCts = new CancellationTokenSource();
         
             await Task.Delay(_debounceInterval, _debounceCts.Token);
@@ -147,16 +144,10 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     }
 }
 
-public class DnsCacheItem {
-    public DnsRecord Record { get; }
-    public DateTime ExpiryTime { get; }
-    public LinkedListNode<string> LruNode { get; }
-
-    public DnsCacheItem(DnsRecord record, LinkedListNode<string> node) {
-        Record = record;
-        ExpiryTime = record.ExpiresAt;
-        LruNode = node;
-    }
+public class DnsCacheItem(DnsRecord record, LinkedListNode<string> node) {
+    public DnsRecord Record { get; } = record;
+    public DateTime ExpiryTime { get; } = record.ExpiresAt;
+    public LinkedListNode<string> LruNode { get; } = node;
 
     public bool IsExpired() => DateTime.UtcNow >= ExpiryTime;
 }
