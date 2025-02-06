@@ -7,7 +7,7 @@ using YASRP.Network.Dns.Models;
 
 namespace YASRP.Network.Dns.DoH;
 
-public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService) : IDoHResolver {
+public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService, IFilteringStrategies ipFilter) : IDoHResolver {
     private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DoHResolver));
     private readonly DoHClient _dohClient = new();
     private readonly SemaphoreSlim _semaphore = new(1, 1);
@@ -65,10 +65,9 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService)
             );
 
             cacheService.AddOrUpdate(domain, record);
-
-            // 异步进行IP测速（将在后续实现）
-            _ = Task.Run(async () => await OptimizeIpAddresses(domain, ipAddresses));
-
+            
+            ipFilter.StartFiltering(domain);
+            
             return ipAddresses;
         }
 

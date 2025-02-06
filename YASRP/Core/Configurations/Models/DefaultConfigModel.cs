@@ -2,6 +2,7 @@ namespace YASRP.Core.Configurations.Models;
 
 public enum DnsSelectionStrategy {
     MinimumPing,
+    LessPackageLoss,
     FastestHandshake
 }
 
@@ -32,7 +33,9 @@ public class AppConfiguration {
     }
 
     public class IpSelectionSettings {
-        public DnsSelectionStrategy Strategy { get; init; } = DnsSelectionStrategy.FastestHandshake;
+        public DnsSelectionStrategy Strategy { get; init; } = DnsSelectionStrategy.MinimumPing;
+        
+        public int MaxResponseTimeMs { get; init; } = 1000;
         public int CacheDurationMinutes { get; init; } = 30;
     }
 

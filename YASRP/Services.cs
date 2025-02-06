@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions {
     public static IServiceCollection AddDoHResolver(this IServiceCollection services) {
         services.AddSingleton<IDoHResolver, DoHResolver>();
         services.AddSingleton<IDnsCacheService, DnsCacheService>();
+        services.AddSingleton<IFilteringStrategies, FilteringStrategies>();
         return services;
     }
 }
