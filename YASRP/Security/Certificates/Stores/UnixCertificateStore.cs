@@ -22,7 +22,7 @@ public class UnixCertificateStore : ICertificateStore {
         var certPath = Path.Combine(PfxStore, $"{friendlyName}.pfx");
 
         // 导出包含私钥的证书
-        var certData = certificate.Export(X509ContentType.Pfx, "yasrp");
+        var certData = certificate.Export(X509ContentType.Pfx);
         File.WriteAllBytes(certPath, certData);
 
         _logger.Info($"Stored certificate at: {certPath}");
@@ -35,7 +35,7 @@ public class UnixCertificateStore : ICertificateStore {
 
         try {
             // 加载包含私钥的证书
-            return new X509Certificate2(certPath, "yasrp");
+            return new X509Certificate2(certPath);
         }
         catch (Exception ex) {
             _logger.Error($"Failed to load certificate: {ex.Message}");

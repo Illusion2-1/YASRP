@@ -55,11 +55,19 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
         var certificateFilePath = Path.Combine(Environment.CurrentDirectory, "SiteCert.pfx");
         if (File.Exists(certificateFilePath)) {
             _logger.Info("Site certificate found on disk. Loading from file.");
-            var certificate = new X509Certificate2(certificateFilePath);
+            try {
+                var certificate = new X509Certificate2(certificateFilePath, string.Empty,
+                    X509KeyStorageFlags.Exportable | 
+                    X509KeyStorageFlags.PersistKeySet | 
+                    X509KeyStorageFlags.MachineKeySet);
 
-            if (ValidateDomainCertificate(certificate, domains.SplitByCommaToHashSet())) {
-                _certificateCache.TryAdd(domains, certificate);
-                return certificate;
+                if (ValidateDomainCertificate(certificate, domains.SplitByCommaToHashSet())) {
+                    _certificateCache.TryAdd(domains, certificate);
+                    return certificate;
+                }
+            }
+            catch (Exception ex) {
+                _logger.Error($"Failed to load certificate from file: {ex.Message}");
             }
         }
 

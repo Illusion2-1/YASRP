@@ -50,26 +50,27 @@ public class DefaultCertificateProvider : ICertificateProvider {
                 true));
 
         var sanBuilder = new SubjectAlternativeNameBuilder();
-
         foreach (var domain in domainArray) sanBuilder.AddDnsName(domain);
-
         request.CertificateExtensions.Add(sanBuilder.Build());
 
         var notBefore = DateTime.UtcNow.AddDays(-1);
-        var notAfter = notBefore.AddMonths(3);
+        var notAfter = notBefore.AddYears(1);
 
         using var rootCertificatePrivateKey = rootCertificate.GetRSAPrivateKey();
         if (rootCertificatePrivateKey == null)
             throw new InvalidOperationException("Root certificate doesn't have a private key");
 
         var certificate = request.Create(rootCertificate, notBefore, notAfter, Guid.NewGuid().ToByteArray());
-
-        var pfxBytes = certificate.Export(X509ContentType.Pfx, string.Empty);
+        var pfxCertificate = certificate.CopyWithPrivateKey(rsa);
+        
+        var pfxBytes = pfxCertificate.Export(X509ContentType.Pfx, string.Empty);
         var fileName = Path.Combine(Environment.CurrentDirectory, "SiteCert.pfx");
         File.WriteAllBytes(fileName, pfxBytes);
-
+        
         return new X509Certificate2(pfxBytes, string.Empty,
-            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+            X509KeyStorageFlags.Exportable | 
+            X509KeyStorageFlags.PersistKeySet | 
+            X509KeyStorageFlags.MachineKeySet);
     }
 
     public bool ValidateDomainInCertificate(X509Certificate2 certificate, IEnumerable<string> allowedDomains) {
