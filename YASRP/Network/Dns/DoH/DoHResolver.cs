@@ -65,9 +65,9 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
             );
 
             cacheService.AddOrUpdate(domain, record);
-            
+
             ipFilter.StartFiltering(domain);
-            
+
             return ipAddresses;
         }
 

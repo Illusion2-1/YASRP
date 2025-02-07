@@ -34,7 +34,7 @@ public class AppConfiguration {
 
     public class IpSelectionSettings {
         public DnsSelectionStrategy Strategy { get; init; } = DnsSelectionStrategy.MinimumPing;
-        
+
         public int MaxResponseTimeMs { get; init; } = 1000;
         public int CacheDurationMinutes { get; init; } = 30;
     }

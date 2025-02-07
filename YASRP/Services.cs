@@ -31,9 +31,8 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IFilteringStrategies, FilteringStrategies>();
         return services;
     }
-    
-    public static IServiceCollection AddReverseProxyCore(this IServiceCollection services)
-    {
+
+    public static IServiceCollection AddReverseProxyCore(this IServiceCollection services) {
         services.AddHttpContextAccessor();
         services.AddScoped<IYasrp, ProxyServer>();
         services.AddHostedService<ProxyServiceWrapper>();

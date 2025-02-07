@@ -33,9 +33,11 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
                 _lruOrder.Remove(item.LruNode);
                 _lruOrder.AddFirst(item.LruNode);
             }
+
             record = item.Record;
             return true;
         }
+
         record = null!;
         return false;
     }
@@ -43,11 +45,12 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     public void AddOrUpdate(string domain, DnsRecord record) {
         var node = new LinkedListNode<string>(domain);
         var newItem = new DnsCacheItem(record, node);
-        
+
         _cache.AddOrUpdate(domain, newItem, (_, existing) => {
             lock (_syncRoot) {
                 _lruOrder.Remove(existing.LruNode);
             }
+
             return newItem;
         });
 
@@ -71,7 +74,7 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     private void Cleanup() {
         var expiredKeys = _cache.Where(kv => kv.Value.IsExpired())
             .Select(kv => kv.Key).ToList();
-        
+
         foreach (var key in expiredKeys) {
             if (!_cache.TryRemove(key, out var item)) continue;
             lock (_syncRoot) {
@@ -91,16 +94,15 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
         try {
             var json = JsonSerializer.Serialize(validRecords);
             File.WriteAllText(_persistPath, json);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             _logger.Error($"Failed to persist DNS cache: {ex.Message}");
         }
     }
 
     private ConcurrentDictionary<string, DnsCacheItem> LoadPersistedCache() {
         try {
-            if (!File.Exists(_persistPath)) {
-                return new ConcurrentDictionary<string, DnsCacheItem>();
-            }
+            if (!File.Exists(_persistPath)) return new ConcurrentDictionary<string, DnsCacheItem>();
 
             var options = new JsonSerializerOptions {
                 PropertyNameCaseInsensitive = true,
@@ -120,7 +122,8 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             }
 
             return cache;
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             _logger.Error($"Failed to load DNS cache: {ex.Message}");
             return new ConcurrentDictionary<string, DnsCacheItem>();
         }
@@ -130,15 +133,16 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
     public void Dispose() {
         _cleanupTimer.Dispose();
     }
-    
+
     private async void ScheduleSizeCheck() {
         try {
             await _debounceCts.CancelAsync();
             _debounceCts = new CancellationTokenSource();
-        
+
             await Task.Delay(_debounceInterval, _debounceCts.Token);
             EnforceSizeLimit();
-        } catch (TaskCanceledException) {
+        }
+        catch (TaskCanceledException) {
             // ignored
         }
     }
@@ -149,5 +153,7 @@ public class DnsCacheItem(DnsRecord record, LinkedListNode<string> node) {
     public DateTime ExpiryTime { get; } = record.ExpiresAt;
     public LinkedListNode<string> LruNode { get; } = node;
 
-    public bool IsExpired() => DateTime.UtcNow >= ExpiryTime;
+    public bool IsExpired() {
+        return DateTime.UtcNow >= ExpiryTime;
+    }
 }

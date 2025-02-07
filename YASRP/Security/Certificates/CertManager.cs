@@ -57,8 +57,8 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
             _logger.Info("Site certificate found on disk. Loading from file.");
             try {
                 var certificate = new X509Certificate2(certificateFilePath, string.Empty,
-                    X509KeyStorageFlags.Exportable | 
-                    X509KeyStorageFlags.PersistKeySet | 
+                    X509KeyStorageFlags.Exportable |
+                    X509KeyStorageFlags.PersistKeySet |
                     X509KeyStorageFlags.MachineKeySet);
 
                 if (ValidateDomainCertificate(certificate, domains.SplitByCommaToHashSet())) {

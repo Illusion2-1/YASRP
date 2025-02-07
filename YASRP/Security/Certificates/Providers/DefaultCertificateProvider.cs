@@ -62,14 +62,14 @@ public class DefaultCertificateProvider : ICertificateProvider {
 
         var certificate = request.Create(rootCertificate, notBefore, notAfter, Guid.NewGuid().ToByteArray());
         var pfxCertificate = certificate.CopyWithPrivateKey(rsa);
-        
+
         var pfxBytes = pfxCertificate.Export(X509ContentType.Pfx, string.Empty);
         var fileName = Path.Combine(Environment.CurrentDirectory, "SiteCert.pfx");
         File.WriteAllBytes(fileName, pfxBytes);
-        
+
         return new X509Certificate2(pfxBytes, string.Empty,
-            X509KeyStorageFlags.Exportable | 
-            X509KeyStorageFlags.PersistKeySet | 
+            X509KeyStorageFlags.Exportable |
+            X509KeyStorageFlags.PersistKeySet |
             X509KeyStorageFlags.MachineKeySet);
     }
 
