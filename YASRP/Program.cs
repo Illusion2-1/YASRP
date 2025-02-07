@@ -4,9 +4,6 @@ using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
 using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Providers;
-using YASRP.Network.Dns.DoH;
-using YASRP.Network.Proxy;
-using YASRP.Security.Certificates;
 
 namespace YASRP;
 
@@ -19,18 +16,19 @@ internal class Program {
 
         var services = new ServiceCollection();
 
-        var (_, serviceProvider) = ConfigureServices(services);
-        
+        var (config, _) = ConfigureServices(services);
+
         var host = Host.CreateDefaultBuilder(args)
-            .ConfigureServices((context, services) =>
-            {
-                // 注册服务
-                var (config, _) = ConfigureServices(services);
-                services.AddSingleton(config); // 添加配置到容器
+            .ConfigureServices((context, services) => {
+                services.AddSingleton(config);
+
+                services.AddCertManager()
+                    .AddDoHResolver()
+                    .AddReverseProxyCore();
             })
             .Build();
-        
-        var certManager = serviceProvider.GetRequiredService<ICertManager>();
+
+        var certManager = host.Services.GetRequiredService<ICertManager>();
         await certManager.InitializeAsync("example.org");
 
         await host.RunAsync();
