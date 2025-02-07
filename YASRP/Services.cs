@@ -4,6 +4,7 @@ using YASRP.Core.Configurations.Models;
 using YASRP.Core.Configurations.Provider;
 using YASRP.Network.Dns.Caching;
 using YASRP.Network.Dns.DoH;
+using YASRP.Network.Proxy;
 using YASRP.Security.Certificates;
 using YASRP.Security.Certificates.Providers;
 using YASRP.Security.Certificates.Stores;
@@ -28,6 +29,14 @@ public static class ServiceCollectionExtensions {
         services.AddSingleton<IDoHResolver, DoHResolver>();
         services.AddSingleton<IDnsCacheService, DnsCacheService>();
         services.AddSingleton<IFilteringStrategies, FilteringStrategies>();
+        return services;
+    }
+    
+    public static IServiceCollection AddReverseProxyCore(this IServiceCollection services)
+    {
+        services.AddHttpContextAccessor();
+        services.AddScoped<IYasrp, ProxyServer>();
+        services.AddHostedService<ProxyServiceWrapper>();
         return services;
     }
 }

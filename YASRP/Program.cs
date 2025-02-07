@@ -1,9 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
 using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Providers;
-using YASRP.Network.Dns.Caching;
+using YASRP.Network.Dns.DoH;
+using YASRP.Network.Proxy;
+using YASRP.Security.Certificates;
 
 namespace YASRP;
 
@@ -17,28 +20,27 @@ internal class Program {
         var services = new ServiceCollection();
 
         var (_, serviceProvider) = ConfigureServices(services);
-
+        
+        var host = Host.CreateDefaultBuilder(args)
+            .ConfigureServices((context, services) =>
+            {
+                // 注册服务
+                var (config, _) = ConfigureServices(services);
+                services.AddSingleton(config); // 添加配置到容器
+            })
+            .Build();
+        
         var certManager = serviceProvider.GetRequiredService<ICertManager>();
         await certManager.InitializeAsync("example.org");
 
-
-        var resolver = serviceProvider.GetRequiredService<IDoHResolver>();
-        var cacheService = serviceProvider.GetRequiredService<IDnsCacheService>();
-
-        var dnsList1 = resolver.QueryIpAddress("huggingface.co").Result;
-        foreach (var ip in dnsList1) logger.Debug(ip);
-
-        var dnsList2 = resolver.QueryIpAddress("files.illusionrealm.com").Result;
-        foreach (var ip in dnsList2) logger.Debug(ip);
-
-
-        cacheService.Persist();
+        await host.RunAsync();
     }
 
     private static (AppConfiguration, ServiceProvider) ConfigureServices(IServiceCollection services) {
         services.AddConfiguration()
             .AddCertManager()
-            .AddDoHResolver();
+            .AddDoHResolver()
+            .AddReverseProxyCore();
 
         var tempProvider = services.BuildServiceProvider();
         var configProvider = tempProvider.GetRequiredService<IConfigurationProvider>();
