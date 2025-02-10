@@ -23,7 +23,7 @@ public class FilteringStrategies(IDnsCacheService cacheService, AppConfiguration
 
         var bestIp = await FindOptimalIpAsync(originalRecord.IpAddresses);
         if (bestIp == null) return;
-
+        if (config.Logging.Level == LogLevel.Debug) _logger.Debug($"Optimal ip for {domain}: {bestIp}");
         UpdateCache(domain, originalRecord, bestIp);
     }
 

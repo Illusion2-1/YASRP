@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using YASRP.Core.Abstractions;
-using YASRP.Core.Configurations.Models;
 using YASRP.Core.Configurations.Provider;
 using YASRP.Network.Dns.Caching;
 using YASRP.Network.Dns.DoH;

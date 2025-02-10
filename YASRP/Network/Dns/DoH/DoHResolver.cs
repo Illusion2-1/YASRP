@@ -57,6 +57,9 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
 
             if (ipAddresses != null && !ipAddresses.Any()) throw new Exception($"No IP addresses found for {domain}");
 
+            if (config.Logging.Level == LogLevel.Debug)
+                foreach (var address in ipAddresses)
+                    _logger.Debug(address);
             // 更新缓存
             var record = new DnsRecord(
                 domain,
@@ -74,10 +77,5 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
         finally {
             _semaphore.Release();
         }
-    }
-
-    private Task OptimizeIpAddresses(string domain, List<string>? ipAddresses) {
-        // 将在后续实现IP测速和优化逻辑
-        return Task.CompletedTask;
     }
 }

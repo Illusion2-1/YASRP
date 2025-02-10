@@ -58,6 +58,7 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             _lruOrder.AddFirst(node);
         }
 
+        Persist();
         ScheduleSizeCheck();
     }
 
