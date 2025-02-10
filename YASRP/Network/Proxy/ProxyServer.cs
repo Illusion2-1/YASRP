@@ -5,6 +5,7 @@ using System.Security.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
@@ -26,16 +27,20 @@ public class ProxyServer : IDisposable, IYasrp {
         var handler = new SocketsHttpHandler {
             UseProxy = false,
             AllowAutoRedirect = false,
+            MaxConnectionsPerServer = 100,
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(config.Dns.CleanupIntervalMinutes),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(config.Dns.CleanupIntervalMinutes + 15),
+            AutomaticDecompression = DecompressionMethods.None,
+            EnableMultipleHttp2Connections = true,
             ConnectCallback = async (context, cancellationToken) => {
                 var targetIp = context.DnsEndPoint.Host;
                 var targetHost = targetIp;
-                
-                if (context.InitialRequestMessage.Headers.Host != null && config.CusdomSnis.TryGetValue(context.InitialRequestMessage.Headers.Host, out string? value)) {
-                    if (value != null) {
+
+                if (context.InitialRequestMessage.Headers.Host != null &&
+                    config.CusdomSnis.TryGetValue(context.InitialRequestMessage.Headers.Host, out var value))
+                    if (value != null)
                         targetHost = value;
-                    }
-                }
-                
+
                 var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
                 await socket.ConnectAsync(IPAddress.Parse(targetIp), context.DnsEndPoint.Port, cancellationToken);
 
@@ -58,6 +63,10 @@ public class ProxyServer : IDisposable, IYasrp {
 
         _webHost = new WebHostBuilder()
             .UseKestrel(options => {
+                options.ConfigureEndpointDefaults(listenOptions => {
+                    options.Limits.MinRequestBodyDataRate = null;
+                    listenOptions.Protocols = HttpProtocols.Http1AndHttp2; // 启用HTTP/2
+                });
                 options.Listen(IPAddress.Any, 443, listenOptions => {
                     listenOptions.UseHttps(new HttpsConnectionAdapterOptions {
                         ServerCertificate = cert,
@@ -95,14 +104,7 @@ public class ProxyServer : IDisposable, IYasrp {
 
         // Copy the request method and content
         requestMessage.Method = new HttpMethod(context.Request.Method);
-        if (context.Request.ContentLength > 0) {
-            requestMessage.Content = new StreamContent(context.Request.Body);
-            foreach (var header in context.Request.Headers) {
-                if (!header.Key.StartsWith("Content-"))
-                    continue;
-                requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-            }
-        }
+        if (context.Request.ContentLength > 0) requestMessage.Content = new StreamContent(context.Request.Body);
 
         // Set up the request URI and headers
         var uriBuilder = new UriBuilder {
@@ -115,12 +117,13 @@ public class ProxyServer : IDisposable, IYasrp {
         requestMessage.RequestUri = uriBuilder.Uri;
         requestMessage.Headers.Host = targetHost; // Keep original host for CDN
 
-        // Copy remaining headers
-        foreach (var header in context.Request.Headers) {
-            if (header.Key.StartsWith("Content-") || header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase))
-                continue;
-            requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-        }
+        foreach (var header in context.Request.Headers)
+            if (header.Key.StartsWith("Content-", StringComparison.OrdinalIgnoreCase)) {
+                if (requestMessage.Content != null) requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+            }
+            else if (!string.Equals(header.Key, "Host", StringComparison.OrdinalIgnoreCase)) {
+                requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+            }
 
         try {
             using var response = await _httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead);
