@@ -29,7 +29,7 @@ internal class Program {
             .Build();
 
         var certManager = host.Services.GetRequiredService<ICertManager>();
-        await certManager.InitializeAsync("example.org");
+        await certManager.InitializeAsync("steamcommunity.com");
 
         await host.RunAsync();
     }

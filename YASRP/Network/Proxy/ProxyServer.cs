@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -25,9 +26,20 @@ public class ProxyServer : IDisposable, IYasrp {
         var handler = new SocketsHttpHandler {
             UseProxy = false,
             AllowAutoRedirect = false,
-            SslOptions = new SslClientAuthenticationOptions {
-                RemoteCertificateValidationCallback = (sender, certificate, chain, errors) => true,
-                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
+            ConnectCallback = async (context, cancellationToken) => {
+                var targetIp = context.DnsEndPoint.Host;
+
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                await socket.ConnectAsync(IPAddress.Parse(targetIp), context.DnsEndPoint.Port, cancellationToken);
+
+                var sslStream = new SslStream(new NetworkStream(socket, true));
+                await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions {
+                    TargetHost = targetIp,
+                    RemoteCertificateValidationCallback = (_, _, _, _) => true,
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
+                }, cancellationToken);
+
+                return sslStream;
             }
         };
 
