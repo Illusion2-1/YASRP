@@ -15,8 +15,10 @@ public enum LogLevel {
 }
 
 public class AppConfiguration {
-    public List<string> TargetDomains { get; init; } = new();
+    public List<string> TargetDomains { get; init; } = ["steamcommunity.com", "huggingface.co"];
 
+    public Dictionary<string, string?> CusdomSnis { get; set; } = new () {{"huggingface.co", "d3q5pwvs88w1av.cloudfront.net"}} ;
+    
     public DnsSettings Dns { get; init; } = new();
     public IpSelectionSettings IpSelection { get; init; } = new();
     public LoggingSettings Logging { get; init; } = new();

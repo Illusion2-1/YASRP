@@ -28,13 +28,20 @@ public class ProxyServer : IDisposable, IYasrp {
             AllowAutoRedirect = false,
             ConnectCallback = async (context, cancellationToken) => {
                 var targetIp = context.DnsEndPoint.Host;
-
+                var targetHost = targetIp;
+                
+                if (context.InitialRequestMessage.Headers.Host != null && config.CusdomSnis.TryGetValue(context.InitialRequestMessage.Headers.Host, out string? value)) {
+                    if (value != null) {
+                        targetHost = value;
+                    }
+                }
+                
                 var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
                 await socket.ConnectAsync(IPAddress.Parse(targetIp), context.DnsEndPoint.Port, cancellationToken);
 
                 var sslStream = new SslStream(new NetworkStream(socket, true));
                 await sslStream.AuthenticateAsClientAsync(new SslClientAuthenticationOptions {
-                    TargetHost = targetIp,
+                    TargetHost = targetHost,
                     RemoteCertificateValidationCallback = (_, _, _, _) => true,
                     EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13
                 }, cancellationToken);
