@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography.X509Certificates;
 using YASRP.Core.Abstractions;
-using YASRP.Core.Configurations.Provider;
 using YASRP.Core.Utilities;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
@@ -76,7 +75,7 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
             if (_rootCertificate == null)
                 throw new InvalidOperationException("Root certificate not initialized");
 
-            var siteCert = certificateProvider.GenerateSiteCertificate(domainName, _rootCertificate);
+            var siteCert = certificateProvider.GenerateSiteCertificate(_rootCertificate);
             _logger.Debug($"Generated site certificate for domain: {domainName}");
             return siteCert;
         });

@@ -29,7 +29,7 @@ internal class Program {
             .Build();
 
         var certManager = host.Services.GetRequiredService<ICertManager>();
-        await certManager.InitializeAsync("steamcommunity.com");
+        await certManager.InitializeAsync("YASRP");
 
         await host.RunAsync();
     }
