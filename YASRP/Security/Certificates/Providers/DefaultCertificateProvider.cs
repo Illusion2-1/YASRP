@@ -76,6 +76,7 @@ public class DefaultCertificateProvider (AppConfiguration config) : ICertificate
 
     public bool ValidateDomainInCertificate(X509Certificate2 certificate, IEnumerable<string> allowedDomains) {
         var allowedDomainsSet = new HashSet<string>(allowedDomains, StringComparer.OrdinalIgnoreCase);
+        _logger.Info("Listing allowed domains:");
         foreach (var s in allowedDomainsSet) _logger.Info(s);
 
         var subjectName = certificate.GetNameInfo(X509NameType.SimpleName, false);

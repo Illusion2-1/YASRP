@@ -45,8 +45,8 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
         return Task.CompletedTask;
     }
 
-    public X509Certificate2 GetOrCreateSiteCertificate(string domains) {
-        if (_certificateCache.TryGetValue(domains, out var cachedCertificate)) {
+    public X509Certificate2 GetOrCreateSiteCertificate(List<string> domains) {
+        if (_certificateCache.TryGetValue(domains.FirstOrDefault() ?? string.Empty, out var cachedCertificate)) {
             _logger.Info("Site certificate found in cache.");
             return cachedCertificate;
         }
@@ -60,8 +60,10 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
                     X509KeyStorageFlags.PersistKeySet |
                     X509KeyStorageFlags.MachineKeySet);
 
-                if (ValidateDomainCertificate(certificate, domains.SplitByCommaToHashSet())) {
-                    _certificateCache.TryAdd(domains, certificate);
+                if (ValidateDomainCertificate(certificate, domains)) {
+                    foreach (var domain in domains) {
+                        _certificateCache.TryAdd(domain, certificate);
+                    }
                     return certificate;
                 }
             }
@@ -71,7 +73,7 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
         }
 
         _logger.Info("No valid cert was found. Generating new.");
-        return _certificateCache.GetOrAdd(domains, (domainName) => {
+        return _certificateCache.GetOrAdd(domains.FirstOrDefault() ?? throw new InvalidOperationException(), (domainName) => {
             if (_rootCertificate == null)
                 throw new InvalidOperationException("Root certificate not initialized");
 
