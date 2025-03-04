@@ -19,7 +19,7 @@ public enum LogLevel {
 public class AppConfiguration {
     public List<string> TargetDomains { get; init; } = ["steamcommunity.com", "huggingface.co"];
 
-    public Dictionary<string, string?> CusdomSnis { get; set; } = new() { { "huggingface.co", "d3q5pwvs88w1av.cloudfront.net" } };
+    public Dictionary<string, string?> CustomSnis { get; set; } = new() { { "huggingface.co", "d3q5pwvs88w1av.cloudfront.net" } };
 
     public DnsSettings Dns { get; init; } = new();
     public IpSelectionSettings IpSelection { get; init; } = new();
@@ -28,12 +28,13 @@ public class AppConfiguration {
     public KestrelSettings Kestrel { get; init; } = new();
 
     public class DnsSettings {
-        public string PrimaryDohServer { get; init; } = "https://9.9.9.9/dns-query";
+        public string PrimaryDohServer { get; init; } = "https://doh.apad.pro/cdn-query";
 
         public List<string> FallbackDohServers { get; init; } =
-            ["https://1.1.1.1/dns-query", "https://101.101.101.101/dns-query", "https://208.67.222.222/dns-query", "https://223.5.5.5/dns-query"];
+            ["https://9.9.9.9/dns-query", "https://1.1.1.1/dns-query", "https://101.101.101.101/dns-query", "https://208.67.222.222/dns-query", "https://223.5.5.5/dns-query"];
 
         public string PlainDnsServer { get; init; } = "1.1.1.1";
+        public bool DnsWarmup { get; init; } = true;
         public int MaxCacheSize { get; init; } = 1000;
         public int CleanupIntervalMinutes { get; set; } = 5;
 

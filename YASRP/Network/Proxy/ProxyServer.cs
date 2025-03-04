@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
+using YASRP.Diagnostics.Logging.Models;
+using YASRP.Diagnostics.Logging.Providers;
 
 namespace YASRP.Network.Proxy;
 
@@ -18,15 +20,16 @@ public class ProxyServer : IDisposable, IYasrp {
     private readonly List<string> _targetDomains;
     private readonly IPAddress _listenIp;
     private readonly int _listenPort;
+    private readonly bool _doWarmup;
     private IWebHost? _webHost;
     private readonly HttpClient _httpClient;
-
     public ProxyServer(ICertManager certManager, IDoHResolver dohResolver, AppConfiguration config) {
         _certManager = certManager;
         _dohResolver = dohResolver;
         _targetDomains = config.TargetDomains;
         _listenIp = IPAddress.Parse(config.Kestrel.ListenAddress);
         _listenPort = config.Kestrel.ListenPort;
+        _doWarmup = config.Dns.DnsWarmup;
         var handler = new SocketsHttpHandler {
             UseProxy = false,
             AllowAutoRedirect = false,
@@ -40,7 +43,7 @@ public class ProxyServer : IDisposable, IYasrp {
                 var targetHost = targetIp;
 
                 if (context.InitialRequestMessage.Headers.Host != null &&
-                    config.CusdomSnis.TryGetValue(context.InitialRequestMessage.Headers.Host, out var value))
+                    config.CustomSnis.TryGetValue(context.InitialRequestMessage.Headers.Host, out var value))
                     if (value != null)
                         targetHost = value;
 
@@ -90,6 +93,10 @@ public class ProxyServer : IDisposable, IYasrp {
             })
             .Build();
 
+        if (_doWarmup) {
+            foreach (var domain in _targetDomains)
+                _ = Task.Run(() => _dohResolver.QueryIpAddress(domain));
+        }
         await _webHost.StartAsync();
     }
 
