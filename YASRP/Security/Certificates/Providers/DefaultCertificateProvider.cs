@@ -1,15 +1,13 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
-using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
-using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 
 namespace YASRP.Security.Certificates.Providers;
 
-public class DefaultCertificateProvider (AppConfiguration config) : ICertificateProvider {
+public class DefaultCertificateProvider(AppConfiguration config) : ICertificateProvider {
     private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DefaultCertificateProvider));
 
     public X509Certificate2 GenerateRootCertificate(string commonName, DateTime notBefore, DateTime notAfter) {

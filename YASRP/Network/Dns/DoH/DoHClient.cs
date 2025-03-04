@@ -1,8 +1,6 @@
 using System.Net;
 using System.Text;
-using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
-using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 
@@ -12,6 +10,7 @@ public class DoHClient {
     private readonly HttpClient _httpClient;
     private readonly ILogWrapper _logger;
     private readonly AppConfiguration _config;
+
     public DoHClient(AppConfiguration config) {
         _config = config;
         _httpClient = new HttpClient {
@@ -22,7 +21,7 @@ public class DoHClient {
     }
 
     public async Task<List<string>?> QueryAsync(string domain, string dohServer) {
-        int maxRetries = _config.Dns.MaxRetries;
+        var maxRetries = _config.Dns.MaxRetries;
         var attempt = 0;
         var exceptions = new List<Exception>();
 
@@ -59,7 +58,7 @@ public class DoHClient {
                 attempt++;
 
                 if (attempt >= maxRetries) break;
-                
+
                 _logger.Warn($"Attempt {attempt} failed: {ex.Message}. Retrying...");
             }
             catch (Exception ex) {
@@ -106,14 +105,14 @@ public class DoHClient {
         message.Add(0x00); // Root label
 
         // Type A
-        message.AddRange(new byte[] { 0x00, 0x01 });
+        message.AddRange([0x00, 0x01]);
         // Class IN
-        message.AddRange(new byte[] { 0x00, 0x01 });
+        message.AddRange([0x00, 0x01]);
 
         return message.ToArray();
     }
 
-    private List<string>? ParseDnsResponse(byte[] response) {
+    private List<string> ParseDnsResponse(byte[] response) {
         var ipAddresses = new List<string>();
 
         // 头部12字节和查询部分

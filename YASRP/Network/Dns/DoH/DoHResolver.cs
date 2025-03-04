@@ -57,7 +57,7 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
 
             if (ipAddresses != null && !ipAddresses.Any()) throw new Exception($"No IP addresses found for {domain}");
 
-            if (config.Logging.Level == LogLevel.Debug)
+            if (config.Logging.Level == LogLevel.Debug && ipAddresses != null)
                 foreach (var address in ipAddresses)
                     _logger.Debug(address);
             // 更新缓存

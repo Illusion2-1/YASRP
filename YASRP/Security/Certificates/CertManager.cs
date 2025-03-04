@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography.X509Certificates;
 using YASRP.Core.Abstractions;
-using YASRP.Core.Utilities;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 using YASRP.Security.Certificates.Providers;
@@ -61,9 +60,7 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
                     X509KeyStorageFlags.MachineKeySet);
 
                 if (ValidateDomainCertificate(certificate, domains)) {
-                    foreach (var domain in domains) {
-                        _certificateCache.TryAdd(domain, certificate);
-                    }
+                    foreach (var domain in domains) _certificateCache.TryAdd(domain, certificate);
                     return certificate;
                 }
             }

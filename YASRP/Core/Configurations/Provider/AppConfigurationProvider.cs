@@ -29,8 +29,6 @@ public class AppConfigurationProvider : IConfigurationProvider {
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(namingConvention)
             .Build();
-
-        CheckConfigPresence();
     }
 
     public AppConfiguration LoadConfiguration() {
@@ -72,18 +70,5 @@ public class AppConfigurationProvider : IConfigurationProvider {
         var defaultConfig = new AppConfiguration();
         SaveConfiguration(defaultConfig);
         return defaultConfig;
-    }
-
-    private void CheckConfigPresence() {
-        try {
-            var dir = Path.GetDirectoryName(_configPath);
-            if (!Directory.Exists(dir)) {
-                Directory.CreateDirectory(dir);
-                _logger.Info($"Created configuration directory: {dir}");
-            }
-        }
-        catch (Exception ex) {
-            _logger.Error($"Failed to create config directory: {ex.Message}");
-        }
     }
 }

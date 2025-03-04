@@ -1,8 +1,6 @@
 using log4net;
 using log4net.Core;
 using Spectre.Console;
-using YASRP.Core.Abstractions;
-using YASRP.Core.Configurations.Provider;
 
 namespace YASRP.Diagnostics.Logging.Models;
 

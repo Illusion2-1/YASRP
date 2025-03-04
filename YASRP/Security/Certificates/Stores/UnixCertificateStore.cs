@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using YASRP.Core.Abstractions;
-using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
 
@@ -57,14 +55,13 @@ public class UnixCertificateStore : ICertificateStore {
             File.WriteAllText(certPath, certPem);
 
             // 执行 update-ca-certificates 命令更新证书存储
-            using var process = new Process {
-                StartInfo = new ProcessStartInfo {
-                    FileName = UbuntuCertUpdateCommand,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo {
+                FileName = UbuntuCertUpdateCommand,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             };
 
             process.Start();

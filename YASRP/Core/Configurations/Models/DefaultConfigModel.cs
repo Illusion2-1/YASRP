@@ -19,8 +19,8 @@ public enum LogLevel {
 public class AppConfiguration {
     public List<string> TargetDomains { get; init; } = ["steamcommunity.com", "huggingface.co"];
 
-    public Dictionary<string, string?> CusdomSnis { get; set; } = new () {{"huggingface.co", "d3q5pwvs88w1av.cloudfront.net"}} ;
-    
+    public Dictionary<string, string?> CusdomSnis { get; set; } = new() { { "huggingface.co", "d3q5pwvs88w1av.cloudfront.net" } };
+
     public DnsSettings Dns { get; init; } = new();
     public IpSelectionSettings IpSelection { get; init; } = new();
     public LoggingSettings Logging { get; init; } = new();
@@ -38,7 +38,7 @@ public class AppConfiguration {
         public int CleanupIntervalMinutes { get; set; } = 5;
 
         public int MaxDnsTimeout { get; init; } = 500;
-        
+
         public int MaxRetries { get; init; } = 3;
     }
 
@@ -46,6 +46,7 @@ public class AppConfiguration {
         public string ListenAddress { get; init; } = IPAddress.Loopback.ToString();
         public int ListenPort { get; init; } = 443;
     }
+
     public class IpSelectionSettings {
         public DnsSelectionStrategy Strategy { get; init; } = DnsSelectionStrategy.MinimumPing;
 
