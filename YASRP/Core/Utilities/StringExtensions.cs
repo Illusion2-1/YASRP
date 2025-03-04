@@ -22,7 +22,7 @@ public static class StringExtensions {
 
     // 转换为 HashSet<string>
     public static HashSet<string> SplitByCommaToHashSet(this string input) {
-        return new HashSet<string>(input.SplitByComma());
+        return [..input.SplitByComma()];
     }
 
     // 转换为只读集合

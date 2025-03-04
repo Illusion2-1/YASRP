@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace YASRP.Core.Configurations.Models;
 
 public enum DnsSelectionStrategy {
@@ -23,6 +25,8 @@ public class AppConfiguration {
     public IpSelectionSettings IpSelection { get; init; } = new();
     public LoggingSettings Logging { get; init; } = new();
 
+    public KestrelSettings Kestrel { get; init; } = new();
+
     public class DnsSettings {
         public string PrimaryDohServer { get; init; } = "https://9.9.9.9/dns-query";
 
@@ -32,8 +36,16 @@ public class AppConfiguration {
         public string PlainDnsServer { get; init; } = "1.1.1.1";
         public int MaxCacheSize { get; init; } = 1000;
         public int CleanupIntervalMinutes { get; set; } = 5;
+
+        public int MaxDnsTimeout { get; init; } = 500;
+        
+        public int MaxRetries { get; init; } = 3;
     }
 
+    public class KestrelSettings {
+        public string ListenAddress { get; init; } = IPAddress.Loopback.ToString();
+        public int ListenPort { get; init; } = 443;
+    }
     public class IpSelectionSettings {
         public DnsSelectionStrategy Strategy { get; init; } = DnsSelectionStrategy.MinimumPing;
 

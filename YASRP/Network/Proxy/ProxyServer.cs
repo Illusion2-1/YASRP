@@ -16,6 +16,8 @@ public class ProxyServer : IDisposable, IYasrp {
     private readonly ICertManager _certManager;
     private readonly IDoHResolver _dohResolver;
     private readonly List<string> _targetDomains;
+    private readonly IPAddress _listenIp;
+    private readonly int _listenPort;
     private IWebHost? _webHost;
     private readonly HttpClient _httpClient;
 
@@ -23,7 +25,8 @@ public class ProxyServer : IDisposable, IYasrp {
         _certManager = certManager;
         _dohResolver = dohResolver;
         _targetDomains = config.TargetDomains;
-
+        _listenIp = IPAddress.Parse(config.Kestrel.ListenAddress);
+        _listenPort = config.Kestrel.ListenPort;
         var handler = new SocketsHttpHandler {
             UseProxy = false,
             AllowAutoRedirect = false,
@@ -59,7 +62,7 @@ public class ProxyServer : IDisposable, IYasrp {
     }
 
     public async Task StartAsync() {
-        var cert = _certManager.GetOrCreateSiteCertificate(_targetDomains.FirstOrDefault() ?? throw new InvalidOperationException("No target domain defined."));
+        var cert = _certManager.GetOrCreateSiteCertificate(_targetDomains);
 
         _webHost = new WebHostBuilder()
             .UseKestrel(options => {
@@ -67,7 +70,7 @@ public class ProxyServer : IDisposable, IYasrp {
                     options.Limits.MinRequestBodyDataRate = null;
                     listenOptions.Protocols = HttpProtocols.Http1AndHttp2; // 启用HTTP/2
                 });
-                options.Listen(IPAddress.Any, 443, listenOptions => {
+                options.Listen(_listenIp, _listenPort, listenOptions => {
                     listenOptions.UseHttps(new HttpsConnectionAdapterOptions {
                         ServerCertificate = cert,
                         ClientCertificateMode = ClientCertificateMode.NoCertificate,

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using YASRP.Core.Abstractions;
+using YASRP.Core.Configurations.Models;
 using YASRP.Core.Configurations.Provider;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
@@ -10,19 +11,18 @@ namespace YASRP.Network.Dns.DoH;
 public class DoHClient {
     private readonly HttpClient _httpClient;
     private readonly ILogWrapper _logger;
-
-    public DoHClient() {
+    private readonly AppConfiguration _config;
+    public DoHClient(AppConfiguration config) {
+        _config = config;
         _httpClient = new HttpClient {
             DefaultRequestVersion = new Version(2, 0),
-            Timeout = TimeSpan.FromSeconds(5)
+            Timeout = TimeSpan.FromMilliseconds(_config.Dns.MaxDnsTimeout)
         };
         _logger = LogWrapperFactory.CreateLogger(nameof(DoHClient));
     }
 
     public async Task<List<string>?> QueryAsync(string domain, string dohServer) {
-        const int maxRetries = 3;
-        const int baseDelayMs = 1000;
-
+        int maxRetries = _config.Dns.MaxRetries;
         var attempt = 0;
         var exceptions = new List<Exception>();
 
@@ -59,10 +59,8 @@ public class DoHClient {
                 attempt++;
 
                 if (attempt >= maxRetries) break;
-
-                var delay = (int)(baseDelayMs * Math.Pow(2, attempt - 1));
-                _logger.Warn($"Attempt {attempt} failed: {ex.Message}. Retrying in {delay}ms");
-                await Task.Delay(delay);
+                
+                _logger.Warn($"Attempt {attempt} failed: {ex.Message}. Retrying...");
             }
             catch (Exception ex) {
                 _logger.Error($"Non-recoverable error: {ex.Message}");

@@ -9,7 +9,7 @@ namespace YASRP.Network.Dns.DoH;
 
 public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService, IFilteringStrategies ipFilter) : IDoHResolver {
     private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DoHResolver));
-    private readonly DoHClient _dohClient = new();
+    private readonly DoHClient _dohClient = new(config);
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
     public async Task<List<string>?> QueryIpAddress(string domain) {
