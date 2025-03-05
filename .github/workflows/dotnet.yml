@@ -33,4 +33,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.runtimeIdentifier }}
-        path: bin/Debug/net6.0/${{ matrix.runtimeIdentifier }}/publish
+        path: bin/Debug/net8.0/${{ matrix.runtimeIdentifier }}/publish
