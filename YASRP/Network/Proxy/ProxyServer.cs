@@ -11,6 +11,7 @@ using YASRP.Core.Abstractions;
 using YASRP.Core.Configurations.Models;
 using YASRP.Diagnostics.Logging.Models;
 using YASRP.Diagnostics.Logging.Providers;
+using YASRP.Monitoring.Traffic;
 
 namespace YASRP.Network.Proxy;
 
@@ -23,6 +24,8 @@ public class ProxyServer : IDisposable, IYasrp {
     private readonly bool _doWarmup;
     private IWebHost? _webHost;
     private readonly HttpClient _httpClient;
+    private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(ProxyServer));
+
     public ProxyServer(ICertManager certManager, IDoHResolver dohResolver, AppConfiguration config) {
         _certManager = certManager;
         _dohResolver = dohResolver;
@@ -62,10 +65,14 @@ public class ProxyServer : IDisposable, IYasrp {
         };
 
         _httpClient = new HttpClient(handler);
+        _logger.Info("ProxyServer initialized with configuration.");
     }
 
     public async Task StartAsync() {
+        _logger.Info("Starting Kestrel server...");
+
         var cert = _certManager.GetOrCreateSiteCertificate(_targetDomains);
+        _logger.Debug("Certificate retrieved or created for target domains.");
 
         _webHost = new WebHostBuilder()
             .UseKestrel(options => {
@@ -84,6 +91,7 @@ public class ProxyServer : IDisposable, IYasrp {
             .Configure(app => {
                 app.Run(async context => {
                     if (!_targetDomains.Contains(context.Request.Host.Host)) {
+                        _logger.Warn($"Request to non-target domain: {context.Request.Host.Host}");
                         context.Response.StatusCode = 404;
                         return;
                     }
@@ -94,17 +102,30 @@ public class ProxyServer : IDisposable, IYasrp {
             .Build();
 
         if (_doWarmup) {
+            _logger.Info("Performing DNS warmup...");
             foreach (var domain in _targetDomains)
                 _ = Task.Run(() => _dohResolver.QueryIpAddress(domain));
         }
+
         await _webHost.StartAsync();
+        _logger.Info("Kestrel server started successfully.");
     }
 
     private async Task HandleProxyRequest(HttpContext context) {
         var targetHost = context.Request.Host.Host;
+        context.Request.EnableBuffering();
+        
+        _logger.Debug($"Handling proxy request for host: {targetHost}");
+
+        var requestCountingStream = new CountingStream(context.Request.Body);
+        requestCountingStream.Position = 0;
+        var responseCountingStream = new CountingStream(context.Response.Body);
+        context.Response.Body = responseCountingStream;
+
         var upstreamIps = await _dohResolver.QueryIpAddress(targetHost);
 
         if (upstreamIps == null || !upstreamIps.Any()) {
+            _logger.Error($"No IP addresses found for host: {targetHost}");
             context.Response.StatusCode = 502;
             return;
         }
@@ -112,9 +133,10 @@ public class ProxyServer : IDisposable, IYasrp {
         var targetIp = upstreamIps.FirstOrDefault();
         var requestMessage = new HttpRequestMessage();
 
-        // Copy the request method and content
         requestMessage.Method = new HttpMethod(context.Request.Method);
-        if (context.Request.ContentLength > 0) requestMessage.Content = new StreamContent(context.Request.Body);
+        if (context.Request.ContentLength > 0) {
+            requestMessage.Content = new StreamContent(requestCountingStream);
+        }
 
         // Set up the request URI and headers
         var uriBuilder = new UriBuilder {
@@ -140,26 +162,34 @@ public class ProxyServer : IDisposable, IYasrp {
 
             context.Response.StatusCode = (int)response.StatusCode;
 
-            foreach (var header in response.Headers) context.Response.Headers[header.Key] = header.Value.ToArray();
+            foreach (var header in response.Headers)
+                context.Response.Headers[header.Key] = header.Value.ToArray();
 
-            foreach (var header in response.Content.Headers) context.Response.Headers[header.Key] = header.Value.ToArray();
+            foreach (var header in response.Content.Headers)
+                context.Response.Headers[header.Key] = header.Value.ToArray();
 
-            await response.Content.CopyToAsync(context.Response.Body);
-        }
-        catch (Exception) {
+            await response.Content.CopyToAsync(responseCountingStream);
+
+            _logger.Debug($"Request completed for {targetHost}: TX={requestCountingStream.BytesRead} bytes, RX={responseCountingStream.BytesWritten} bytes");
+        } catch (Exception ex) {
+            _logger.Error(ex);
             context.Response.StatusCode = 502;
         }
     }
 
     public async Task StopAsync() {
         if (_webHost != null) {
+            _logger.Info("Stopping Kestrel server...");
             await _webHost.StopAsync();
             _webHost.Dispose();
+            _logger.Info("Kestrel server stopped successfully.");
         }
     }
 
     public void Dispose() {
+        _logger.Info("Disposing Kestrel...");
         _webHost?.Dispose();
         _httpClient.Dispose();
+        _logger.Info("Kestrel disposed successfully.");
     }
 }

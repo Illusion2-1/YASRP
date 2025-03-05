@@ -9,7 +9,7 @@ public class Log4NetWrapper(string loggerName) : ILogWrapper {
     private static Level _currentLevel = Level.Debug;
 
     public void Info(string message) {
-        if (_currentLevel <= Level.Info) _logger.Info(message);
+        _logger.Info(message);
     }
 
     public void Debug(string message) {
@@ -17,11 +17,11 @@ public class Log4NetWrapper(string loggerName) : ILogWrapper {
     }
 
     public void Warn(string message) {
-        if (_currentLevel <= Level.Warn) _logger.Warn($"\u001b[33m{message}\u001b[0m");
+        _logger.Warn($"\u001b[33m{message}\u001b[0m");
     }
 
     public void Error(string message) {
-        if (_currentLevel <= Level.Error) _logger.Error($"\u001b[31m{message}\u001b[0m");
+        _logger.Error($"\u001b[31m{message}\u001b[0m");
     }
 
     public void Error(Exception e) {

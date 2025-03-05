@@ -18,8 +18,7 @@ public class UnixCertificateStore : ICertificateStore {
 
     public void StoreRootCertificate(X509Certificate2 certificate, string friendlyName) {
         var certPath = Path.Combine(PfxStore, $"{friendlyName}.pfx");
-
-        // 导出包含私钥的证书
+        
         var certData = certificate.Export(X509ContentType.Pfx);
         File.WriteAllBytes(certPath, certData);
 
@@ -32,7 +31,6 @@ public class UnixCertificateStore : ICertificateStore {
             return null;
 
         try {
-            // 加载包含私钥的证书
             return new X509Certificate2(certPath);
         }
         catch (Exception ex) {
@@ -47,10 +45,7 @@ public class UnixCertificateStore : ICertificateStore {
         if (File.Exists(certPath)) return;
 
         try {
-            // 将证书导出为 PEM 格式（.crt 文件）
             var certPem = ExportCertificateAsPem(rootCertificate);
-
-            // 将 PEM 格式的证书写入系统证书存储目录
 
             File.WriteAllText(certPath, certPem);
 

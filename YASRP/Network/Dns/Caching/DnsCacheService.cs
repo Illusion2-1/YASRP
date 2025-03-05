@@ -9,7 +9,7 @@ using YASRP.Network.Dns.Models;
 namespace YASRP.Network.Dns.Caching;
 
 public class DnsCacheService : IDnsCacheService, IDisposable {
-    private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DoHResolver));
+    private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DnsCacheService));
     private readonly ConcurrentDictionary<string, DnsCacheItem> _cache;
     private readonly LinkedList<string> _lruOrder = new();
     private CancellationTokenSource _debounceCts = new();
@@ -23,8 +23,13 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
         _maxSize = config.Dns.MaxCacheSize;
         _persistPath = Path.Combine(Environment.CurrentDirectory, "dns_cache.json");
         _cache = LoadPersistedCache();
+        _logger.Info($"DNS cache initialized. Loaded {_cache.Count} entries from persistence");
+        
         _cleanupTimer = new Timer(_ => Cleanup(), null,
-            TimeSpan.FromMinutes(config.Dns.CleanupIntervalMinutes), TimeSpan.FromMinutes(config.Dns.CleanupIntervalMinutes));
+            TimeSpan.FromMinutes(config.Dns.CleanupIntervalMinutes), 
+            TimeSpan.FromMinutes(config.Dns.CleanupIntervalMinutes));
+        
+        _logger.Debug($"Cache cleanup scheduled every {config.Dns.CleanupIntervalMinutes} minutes");
     }
 
     public bool TryGet(string domain, out DnsRecord record) {
@@ -33,11 +38,12 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
                 _lruOrder.Remove(item.LruNode);
                 _lruOrder.AddFirst(item.LruNode);
             }
-
+            _logger.Debug($"{domain}: Cache hit.");
             record = item.Record;
             return true;
         }
 
+        _logger.Debug($"{domain}: Cache missed.");
         record = null!;
         return false;
     }
@@ -46,11 +52,13 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
         var node = new LinkedListNode<string>(domain);
         var newItem = new DnsCacheItem(record, node);
 
+        var operation = _cache.ContainsKey(domain) ? "Updating" : "Adding";
+        _logger.Info($"{operation} cache entry for {domain} with {record.IpAddresses?.Count ?? 0} IPs");
+
         _cache.AddOrUpdate(domain, newItem, (_, existing) => {
             lock (_syncRoot) {
                 _lruOrder.Remove(existing.LruNode);
             }
-
             return newItem;
         });
 
@@ -64,10 +72,15 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
 
     private void EnforceSizeLimit() {
         lock (_syncRoot) {
+            var initialCount = _cache.Count;
             while (_cache.Count > _maxSize && _lruOrder.Last != null) {
                 var oldestDomain = _lruOrder.Last.Value;
                 _cache.TryRemove(oldestDomain, out _);
                 _lruOrder.RemoveLast();
+            }
+            var removedCount = initialCount - _cache.Count;
+            if (removedCount > 0) {
+                _logger.Info($"Enforced lru size limit - Removed {removedCount} old entries");
             }
         }
     }
@@ -83,11 +96,11 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             }
         }
 
+        _logger.Info($"Lru cache cleanup completed - Removed {expiredKeys.Count} expired entries");
         EnforceSizeLimit();
     }
 
     public void Persist() {
-        // 仅持久化有效记录，排除 LruNode 字段
         var validRecords = _cache
             .Where(kv => !kv.Value.IsExpired())
             .ToDictionary(kv => kv.Key, kv => kv.Value.Record);
@@ -95,6 +108,7 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
         try {
             var json = JsonSerializer.Serialize(validRecords);
             File.WriteAllText(_persistPath, json);
+            _logger.Debug($"Persisted {validRecords.Count} DNS records to {_persistPath}");
         }
         catch (Exception ex) {
             _logger.Error($"Failed to persist DNS cache: {ex.Message}");
@@ -103,7 +117,10 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
 
     private ConcurrentDictionary<string, DnsCacheItem> LoadPersistedCache() {
         try {
-            if (!File.Exists(_persistPath)) return new ConcurrentDictionary<string, DnsCacheItem>();
+            if (!File.Exists(_persistPath)) {
+                _logger.Debug("No existing cache file found");
+                return new ConcurrentDictionary<string, DnsCacheItem>();
+            }
 
             var options = new JsonSerializerOptions {
                 PropertyNameCaseInsensitive = true,
@@ -115,6 +132,7 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
 
             var cache = new ConcurrentDictionary<string, DnsCacheItem>();
             if (records == null) return cache;
+            
             foreach (var kv in records) {
                 var node = new LinkedListNode<string>(kv.Key);
                 var item = new DnsCacheItem(kv.Value, node);
@@ -122,6 +140,7 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
                 _lruOrder.AddFirst(node);
             }
 
+            _logger.Info($"Loaded {records.Count} entries from cache file");
             return cache;
         }
         catch (Exception ex) {
@@ -130,9 +149,11 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
         }
     }
 
-
     public void Dispose() {
+        _logger.Info("Disposing DNS cache service");
         _cleanupTimer.Dispose();
+        Persist();
+        _logger.Info("DNS cache service disposed");
     }
 
     private async void ScheduleSizeCheck() {
@@ -140,11 +161,13 @@ public class DnsCacheService : IDnsCacheService, IDisposable {
             await _debounceCts.CancelAsync();
             _debounceCts = new CancellationTokenSource();
 
+            _logger.Debug("Scheduling debounced size check");
             await Task.Delay(_debounceInterval, _debounceCts.Token);
+            _logger.Debug("Executing size check after debounce");
             EnforceSizeLimit();
         }
         catch (TaskCanceledException) {
-            // ignored
+            _logger.Debug("Size check was canceled due to new update");
         }
     }
 }

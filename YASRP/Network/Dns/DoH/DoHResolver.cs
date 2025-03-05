@@ -15,7 +15,6 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
     public async Task<List<string>?> QueryIpAddress(string domain) {
         // 检查缓存
         if (cacheService.TryGet(domain, out var cachedRecord)) {
-            _logger.Debug($"Cache hit for {domain}");
             return cachedRecord.IpAddresses;
         }
 
@@ -24,7 +23,6 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
         try {
             // 双重检查，防止其他线程已经更新了缓存
             if (cacheService.TryGet(domain, out cachedRecord)) return cachedRecord.IpAddresses;
-            _logger.Info($"{domain}: No cache was available, querying records from server");
             List<string>? ipAddresses = null;
             Exception? lastException;
 

@@ -11,6 +11,8 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
     private readonly ILogWrapper _logger = LogWrapperFactory.CreateLogger(nameof(DefaultCertificateProvider));
 
     public X509Certificate2 GenerateRootCertificate(string commonName, DateTime notBefore, DateTime notAfter) {
+        _logger.Info($"Generating root certificate with CN={commonName}");
+
         using var rsa = RSA.Create(4096);
         var request = new CertificateRequest(
             $"CN={commonName}",
@@ -27,11 +29,15 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
                 true));
 
         var certificate = request.CreateSelfSigned(notBefore, notAfter);
+        _logger.Info("Root certificate generated successfully.");
+
         return new X509Certificate2(certificate.Export(X509ContentType.Pfx), string.Empty,
             X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
     }
 
     public X509Certificate2 GenerateSiteCertificate(X509Certificate2 rootCertificate) {
+        _logger.Info("Generating site certificate...");
+
         using var rsa = RSA.Create(2048);
         var domainArray = config.TargetDomains.ToArray();
         var request = new CertificateRequest(
@@ -49,15 +55,20 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
                 true));
 
         var sanBuilder = new SubjectAlternativeNameBuilder();
-        foreach (var domain in domainArray) sanBuilder.AddDnsName(domain);
+        foreach (var domain in domainArray) {
+            sanBuilder.AddDnsName(domain);
+            _logger.Debug($"Added DNS name to SAN: {domain}");
+        }
         request.CertificateExtensions.Add(sanBuilder.Build());
 
         var notBefore = DateTime.UtcNow.AddDays(-1);
         var notAfter = notBefore.AddYears(1);
 
         using var rootCertificatePrivateKey = rootCertificate.GetRSAPrivateKey();
-        if (rootCertificatePrivateKey == null)
+        if (rootCertificatePrivateKey == null) {
+            _logger.Error("Root certificate doesn't have a private key");
             throw new InvalidOperationException("Root certificate doesn't have a private key");
+        }
 
         var certificate = request.Create(rootCertificate, notBefore, notAfter, Guid.NewGuid().ToByteArray());
         var pfxCertificate = certificate.CopyWithPrivateKey(rsa);
@@ -66,6 +77,8 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
         var fileName = Path.Combine(Environment.CurrentDirectory, "SiteCert.pfx");
         File.WriteAllBytes(fileName, pfxBytes);
 
+        _logger.Info($"Site certificate generated and saved to {fileName}");
+
         return new X509Certificate2(pfxBytes, string.Empty,
             X509KeyStorageFlags.Exportable |
             X509KeyStorageFlags.PersistKeySet |
@@ -73,9 +86,13 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
     }
 
     public bool ValidateDomainInCertificate(X509Certificate2 certificate, IEnumerable<string> allowedDomains) {
+        _logger.Info("Validating domains in certificate...");
+
         var allowedDomainsSet = new HashSet<string>(allowedDomains, StringComparer.OrdinalIgnoreCase);
-        _logger.Info("Listing allowed domains:");
-        foreach (var s in allowedDomainsSet) _logger.Info(s);
+        if (config.Logging.Level == LogLevel.Debug) {
+            _logger.Debug("Listing allowed domains:");
+            foreach (var s in allowedDomainsSet) _logger.Debug(s);
+        }
 
         var subjectName = certificate.GetNameInfo(X509NameType.SimpleName, false);
         if (!string.IsNullOrEmpty(subjectName) && !allowedDomainsSet.Contains(subjectName)) {
@@ -89,8 +106,7 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
         if (sanExtension != null) {
             var asnData = new AsnEncodedData(sanExtension.Oid!, sanExtension.RawData);
             var sanString = asnData.Format(false);
-
-            // 使用正则表达式匹配所有DNS条目
+            
             var matches = Regex.Matches(sanString, @"DNS\s*(?:Name)?\s*:\s*([^,\s]+)", RegexOptions.IgnoreCase);
             foreach (Match match in matches) {
                 if (match.Groups.Count < 2) continue;
@@ -103,6 +119,7 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
             }
         }
 
+        _logger.Info("Certificate domain validation successful.");
         return true;
     }
 }
