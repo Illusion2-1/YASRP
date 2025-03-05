@@ -119,40 +119,56 @@ public class DoHClient {
         return message.ToArray();
     }
 
-    private (List<string> ARecords, List<string> Cnames, bool HasSoa) ParseDnsResponse(byte[] response) {
+    public (List<string> ARecords, List<string> Cnames, bool HasSoa) ParseDnsResponse(byte[] response) {
         var aRecords = new List<string>();
         var cnames = new List<string>();
         var hasSoa = false;
 
         try {
+            //  0-1: ID, 2-3: Flags, 4-5: QDCOUNT, 6-7: ANCOUNT, 8-9: NSCOUNT, 10-11: ARCOUNT
             var answerCount = (response[6] << 8) | response[7];
-            var position = 12;
+            var position = 12; // DNS 头部
+            
+            position = ReadDnsName(response, position, out _);
+            //  QTYPE (2) 和 QCLASS (2)
+            position += 4;
 
-            // Skip question section
-            while (position < response.Length && response[position] != 0) position++;
-            position += 5;
-
+            // 遍历所有 Answer
             for (var i = 0; i < answerCount && position < response.Length; i++) {
+                // 名（NAME）
                 position = ReadDnsName(response, position, out _);
-                var type = (response[position + 1] << 8) | response[position];
-                position += 4; // Skip class
-                position += 4; // Skip TTL
+
+                // TYPE (2)、CLASS (2)、TTL (4)、RDLENGTH (2)
+                var type = (response[position] << 8) | response[position + 1];
+                position += 2;
+
+                _ = (response[position] << 8) | response[position + 1];
+                position += 2;
+
+                // TTL（4字节）
+                _ = ((uint)response[position] << 24) | ((uint)response[position + 1] << 16) |
+                    ((uint)response[position + 2] << 8) | response[position + 3];
+                position += 4;
+
                 var dataLength = (response[position] << 8) | response[position + 1];
                 position += 2;
 
+                // 根据不同的 TYPE 处理 RDATA
                 switch (type) {
-                    case 1 when dataLength == 4: // A record
+                    case 1 when dataLength == 4: // A (IPv4)
                         aRecords.Add($"{response[position]}.{response[position + 1]}.{response[position + 2]}.{response[position + 3]}");
                         break;
-                    case 5: // CNAME
+                    case 5: // CNAME 
                         var cnamePos = position;
-                        cnames.Add(ReadDnsName(response, ref cnamePos));
+                        var cname = ReadDnsName(response, ref cnamePos);
+                        cnames.Add(cname);
                         break;
-                    case 6: // SOA
+                    case 6: // SOA，直接标记一下即可
                         hasSoa = true;
                         break;
                 }
 
+                // 跳过 RDATA 部分
                 position += dataLength;
             }
         }
@@ -165,24 +181,28 @@ public class DoHClient {
 
     private int ReadDnsName(byte[] response, int position, out string name) {
         var labels = new List<string>();
-        var initialPosition = position;
         var recursionLimit = 0;
 
         while (true) {
-            if (position >= response.Length || recursionLimit++ > 16) break;
+            if (position >= response.Length || recursionLimit++ > 16)
+                break;
 
             var labelLength = response[position++];
-            if (labelLength == 0) break;
+            if (labelLength == 0)
+                break;
 
+            // 压缩指针：高两位为1
             if ((labelLength & 0xC0) == 0xC0) {
                 var pointer = ((labelLength & 0x3F) << 8) | response[position++];
                 ReadDnsName(response, pointer, out var compressedName);
                 labels.Add(compressedName);
                 break;
             }
-
-            if (position + labelLength > response.Length) break;
-            labels.Add(Encoding.ASCII.GetString(response, position, labelLength));
+            
+            if (position + labelLength > response.Length)
+                break;
+            var label = Encoding.ASCII.GetString(response, position, labelLength);
+            labels.Add(label);
             position += labelLength;
         }
 
@@ -192,14 +212,15 @@ public class DoHClient {
 
     private string ReadDnsName(byte[] response, ref int position) {
         var name = new StringBuilder();
-        var initialPosition = position;
         var recursionLimit = 0;
 
         while (true) {
-            if (position >= response.Length || recursionLimit++ > 16) break;
+            if (position >= response.Length || recursionLimit++ > 16)
+                break;
 
             var labelLength = response[position++];
-            if (labelLength == 0) break;
+            if (labelLength == 0)
+                break;
 
             if ((labelLength & 0xC0) == 0xC0) {
                 var pointer = ((labelLength & 0x3F) << 8) | response[position++];
@@ -208,13 +229,17 @@ public class DoHClient {
                 break;
             }
 
-            if (position + labelLength > response.Length) break;
+            if (position + labelLength > response.Length)
+                break;
+
             name.Append(Encoding.ASCII.GetString(response, position, labelLength));
             position += labelLength;
             name.Append('.');
         }
 
-        if (name.Length > 0 && name[^1] == '.') name.Length--;
+        if (name.Length > 0 && name[name.Length - 1] == '.')
+            name.Length--; // 移除末尾的点
+
         return name.ToString();
     }
 
