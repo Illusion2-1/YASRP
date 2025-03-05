@@ -156,6 +156,6 @@ public class AppConfiguration {
     }
 
     public class LoggingSettings {
-        public LogLevel Level { get; init; } = LogLevel.Debug;
+        public LogLevel Level { get; init; } = LogLevel.Info;
     }
 }

@@ -13,22 +13,17 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
     public async Task<List<string>?> QueryIpAddress(string domain) {
-        // 检查缓存
         if (cacheService.TryGet(domain, out var cachedRecord)) {
             return cachedRecord.IpAddresses;
         }
-
-        // 如果缓存不存在或已过期，进行查询
+        
         await _semaphore.WaitAsync();
         try {
-            // 双重检查，防止其他线程已经更新了缓存
-            if (cacheService.TryGet(domain, out cachedRecord)) return cachedRecord.IpAddresses;
             List<string>? ipAddresses = null;
             Exception? lastException;
 
             try {
                 _logger.Debug("Querying DoH server");
-                // 尝试使用主DoH服务器
                 ipAddresses = await _dohClient.QueryAsync(domain, config.Dns.PrimaryDohServer);
             }
             catch (Exception? primaryEx) {
@@ -40,7 +35,7 @@ public class DoHResolver(AppConfiguration config, IDnsCacheService cacheService,
                     try {
                         _logger.Debug($"Querying fallback DoH server: {fallbackServer}");
                         ipAddresses = await _dohClient.QueryAsync(domain, fallbackServer);
-                        break; // 如果成功获取IP地址，跳出循环
+                        break;
                     }
                     catch (Exception? fallbackEx) {
                         _logger.Warn($"Fallback DoH server failed: {fallbackServer}, Error: {fallbackEx.Message}");

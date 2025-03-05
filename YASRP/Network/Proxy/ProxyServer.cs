@@ -80,7 +80,7 @@ public class ProxyServer : IDisposable, IYasrp {
             .UseKestrel(options => {
                 options.ConfigureEndpointDefaults(listenOptions => {
                     options.Limits.MinRequestBodyDataRate = null;
-                    listenOptions.Protocols = HttpProtocols.Http1AndHttp2; // 启用HTTP/2
+                    listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
                 });
                 options.Listen(_listenIp, _listenPort, listenOptions => {
                     listenOptions.UseHttps(new HttpsConnectionAdapterOptions {
