@@ -33,4 +33,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.runtimeIdentifier }}
-        path: bin/Debug/net8.0/${{ matrix.runtimeIdentifier }}/publish
+        path: /home/runner/work/YASRP/YASRP/YASRP/bin/Release/net8.0/${{ matrix.runtimeIdentifier }}/publish
