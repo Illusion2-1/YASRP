@@ -1,0 +1,36 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        runtimeIdentifier: [ linux-x64, linux-arm, linux-arm64, linux-musl-x64, linux-musl-arm64 ]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Publish
+      run: |
+        dotnet publish --no-self-contained -p:PublishSingleFile=true -p:IncludeContentInSingleFile=true -p:RuntimeIdentifier=${{ matrix.runtimeIdentifier }}
+    - name: Upload binary files(${{ matrix.runtimeIdentifier }})
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.runtimeIdentifier }}
+        path: bin/Debug/net6.0/${{ matrix.runtimeIdentifier }}/publish
