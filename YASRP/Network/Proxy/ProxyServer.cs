@@ -21,6 +21,7 @@ public class ProxyServer : IDisposable, IYasrp {
     private readonly List<string> _targetDomains;
     private readonly IPAddress _listenIp;
     private readonly int _listenPort;
+    private readonly int _warmupDelay;
     private readonly bool _doWarmup;
     private IWebHost? _webHost;
     private readonly HttpClient _httpClient;
@@ -33,6 +34,7 @@ public class ProxyServer : IDisposable, IYasrp {
         _listenIp = IPAddress.Parse(config.Kestrel.ListenAddress);
         _listenPort = config.Kestrel.ListenPort;
         _doWarmup = config.Dns.DnsWarmup;
+        _warmupDelay = config.Dns.DnsWarmupDelayMs;
         var handler = new SocketsHttpHandler {
             UseProxy = false,
             AllowAutoRedirect = false,
@@ -101,11 +103,7 @@ public class ProxyServer : IDisposable, IYasrp {
             })
             .Build();
 
-        if (_doWarmup) {
-            _logger.Info("Performing DNS warmup...");
-            foreach (var domain in _targetDomains)
-                _ = Task.Run(() => _dohResolver.QueryIpAddress(domain));
-        }
+        if (_doWarmup) _ = DnsWarmupTask();
 
         await _webHost.StartAsync();
         _logger.Info("Kestrel server started successfully.");
@@ -114,7 +112,7 @@ public class ProxyServer : IDisposable, IYasrp {
     private async Task HandleProxyRequest(HttpContext context) {
         var targetHost = context.Request.Host.Host;
         context.Request.EnableBuffering();
-        
+
         _logger.Debug($"Handling proxy request for host: {targetHost}");
 
         var requestCountingStream = new CountingStream(context.Request.Body);
@@ -134,9 +132,7 @@ public class ProxyServer : IDisposable, IYasrp {
         var requestMessage = new HttpRequestMessage();
 
         requestMessage.Method = new HttpMethod(context.Request.Method);
-        if (context.Request.ContentLength > 0) {
-            requestMessage.Content = new StreamContent(requestCountingStream);
-        }
+        if (context.Request.ContentLength > 0) requestMessage.Content = new StreamContent(requestCountingStream);
 
         // Set up the request URI and headers
         var uriBuilder = new UriBuilder {
@@ -171,7 +167,8 @@ public class ProxyServer : IDisposable, IYasrp {
             await response.Content.CopyToAsync(responseCountingStream);
 
             _logger.Debug($"Request completed for {targetHost}: TX={requestCountingStream.BytesRead} bytes, RX={responseCountingStream.BytesWritten} bytes");
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             _logger.Error(ex);
             context.Response.StatusCode = 502;
         }
@@ -191,5 +188,19 @@ public class ProxyServer : IDisposable, IYasrp {
         _webHost?.Dispose();
         _httpClient.Dispose();
         _logger.Info("Kestrel disposed successfully.");
+    }
+
+    private async Task DnsWarmupTask() {
+        _logger.Info("Performing DNS warmup...");
+        Task? warmTask = null;
+        foreach (var domain in _targetDomains) {
+            await Task.Delay(_warmupDelay);
+            warmTask = Task.Run(() => _dohResolver.QueryIpAddress(domain));
+        }
+
+        if (warmTask != null) {
+            warmTask.Wait();
+            _logger.Info("DNS warmup completed");
+        }
     }
 }
