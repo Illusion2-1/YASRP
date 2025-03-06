@@ -191,7 +191,7 @@ sequenceDiagram
 
     Note over C,P: 应用层数据传输
     C->>P: HTTP/1.1 GET / <br> Host: censored.example.com
-    P->>S: 复用保持的SSL连接 <br>└── HTTP/1.1 GET / <br>     Host: harmless.example.com
+    P->>S: 复用保持的SSL连接 <br>└── HTTP/1.1 GET / <br>     Host: censored.example.com
     S-->>P: HTTP/1.1 200 OK <br> (加密响应流)
     P-->>C: HTTP/1.1 200 OK <br> (重新加密流)
 
