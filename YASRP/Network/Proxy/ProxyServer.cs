@@ -166,7 +166,7 @@ public class ProxyServer : IDisposable, IYasrp {
 
             await response.Content.CopyToAsync(responseCountingStream);
 
-            _logger.Debug($"Request completed for {targetHost}: TX={requestCountingStream.BytesRead} bytes, RX={responseCountingStream.BytesWritten} bytes");
+            _logger.Info($"Request completed for {targetHost}: TX={requestCountingStream.BytesRead} bytes, RX={responseCountingStream.BytesWritten} bytes");
         }
         catch (Exception ex) {
             _logger.Error(ex);
