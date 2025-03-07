@@ -115,7 +115,7 @@ public class AppConfiguration {
     public KestrelSettings Kestrel { get; init; } = new();
 
     public class DnsSettings {
-        public string PrimaryDohServer { get; init; } = "https://doh.apad.pro/cdn-query";
+        public string PrimaryDohServer { get; init; } = "https://yasrp.illusionrealm.com/dns-query";
 
         public List<string> FallbackDohServers { get; init; } =
             [
