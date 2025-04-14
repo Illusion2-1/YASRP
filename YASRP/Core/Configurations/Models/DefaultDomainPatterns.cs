@@ -62,11 +62,13 @@ public static class DefaultDomainPatterns {
         "desktop.github.com",
         "guides.github.com",
         "github-releases.githubusercontent.com",
-        "objects.githubusercontent.com"
+        "objects.githubusercontent.com",
+        "cdn-lfs-us-1.hf.co"
     ];
 
     public static Dictionary<string, string?> CustomSnis => new() {
         { "huggingface.co", "d3q5pwvs88w1av.cloudfront.net" },
+        { "cdn-lfs-us-1.hf.co", "d3q5pwvs88w1av.cloudfront.net" },
         { "www.huggingface.co", "d3q5pwvs88w1av.cloudfront.net" },
         { "datasets-server.huggingface.co", "d3q5pwvs88w1av.cloudfront.net" },
         { "cdn-thumbnails.huggingface.co", "d3q5pwvs88w1av.cloudfront.net" },
