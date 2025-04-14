@@ -87,7 +87,7 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
         }
 
         _logger.Info("No valid certificate available, generating new site certificate...");
-        return _certificateCache.GetOrAdd(primaryDomain, domainName => {
+        return _certificateCache.GetOrAdd(primaryDomain, _ => {
             if (_rootCertificate == null) {
                 _logger.Error("Root certificate not initialized when creating site certificate");
                 throw new InvalidOperationException("Root certificate not initialized");
@@ -108,7 +108,7 @@ public class CertManager(ICertificateProvider certificateProvider, ICertificateS
     private bool ValidateDomainCertificate(X509Certificate2 certificate, IEnumerable<string> allowedDomains) {
         var enumerable = allowedDomains.ToList();
         _logger.Debug($"Validating certificate for domains: {string.Join(", ", enumerable)}");
-        var result = certificateProvider.ValidateDomainInCertificate(certificate, enumerable);
+        var result = certificateProvider.ValidateDomainsInCertificate(certificate, enumerable);
         _logger.Debug($"Certificate validation result: {(result ? "Valid" : "Invalid")}");
         return result;
     }

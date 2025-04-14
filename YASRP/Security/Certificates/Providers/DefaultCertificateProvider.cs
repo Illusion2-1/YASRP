@@ -85,41 +85,84 @@ public class DefaultCertificateProvider(AppConfiguration config) : ICertificateP
             X509KeyStorageFlags.MachineKeySet);
     }
 
-    public bool ValidateDomainInCertificate(X509Certificate2 certificate, IEnumerable<string> allowedDomains) {
-        _logger.Info("Validating domains in certificate...");
+    public bool ValidateDomainsInCertificate(X509Certificate2 certificate, IEnumerable<string> requiredDomains) {
+        _logger.Info("Validating ALL required domains are present in certificate...");
 
-        var allowedDomainsSet = new HashSet<string>(allowedDomains, StringComparer.OrdinalIgnoreCase);
-        if (config.Logging.Level == LogLevel.Debug) {
-            _logger.Debug("Listing allowed domains:");
-            foreach (var s in allowedDomainsSet) _logger.Debug(s);
+        var requiredDomainsSet = new HashSet<string>(requiredDomains, StringComparer.OrdinalIgnoreCase);
+        
+        if (!requiredDomainsSet.Any()) {
+            _logger.Info("No specific domains required. Validation successful by definition.");
+            return true;
         }
 
+        _logger.Info($"Required domains set: {{{string.Join(", ", requiredDomainsSet)}}}");
+        
+        var domainsFoundInCert = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
         var subjectName = certificate.GetNameInfo(X509NameType.SimpleName, false);
-        if (!string.IsNullOrEmpty(subjectName) && !allowedDomainsSet.Contains(subjectName)) {
-            _logger.Warn($"Certificate CN {subjectName} not in allowed domains list");
-            return false;
+        if (!string.IsNullOrEmpty(subjectName)) {
+            _logger.Debug($"Found CN: '{subjectName}'");
+            domainsFoundInCert.Add(subjectName);
         }
+        else {
+            _logger.Debug("Certificate has no CN (SimpleName).");
+        }
+        
+        const string sanOid = "2.5.29.17";
 
-        var sanExtension = certificate.Extensions
-            .FirstOrDefault(ext => ext.Oid?.Value == "2.5.29.17");
+        if (certificate.Extensions
+                .FirstOrDefault(ext => ext.Oid?.Value == sanOid) is { } sanExtension) {
+            _logger.Debug("Found SAN extension. Parsing DNS names...");
+            try
+            {
+                var asnData = new AsnEncodedData(sanExtension.Oid!, sanExtension.RawData);
+                var sanString = asnData.Format(false);
+                _logger.Debug($"Raw SAN string from Format(false): {sanString}");
+                
+                var matches = Regex.Matches(sanString, @"(?:DNS Name=|DNS:)\s*([^,\s]+)", RegexOptions.IgnoreCase);
 
-        if (sanExtension != null) {
-            var asnData = new AsnEncodedData(sanExtension.Oid!, sanExtension.RawData);
-            var sanString = asnData.Format(false);
-            
-            var matches = Regex.Matches(sanString, @"DNS\s*(?:Name)?\s*:\s*([^,\s]+)", RegexOptions.IgnoreCase);
-            foreach (Match match in matches) {
-                if (match.Groups.Count < 2) continue;
+                if (matches.Count == 0) _logger.Debug("No DNS names found in SAN extension via Regex on formatted string.");
 
-                var domain = match.Groups[1].Value.Trim();
-                if (!allowedDomainsSet.Contains(domain)) {
-                    _logger.Warn($"SAN domain {domain} not in allowed domains list");
-                    return false;
-                }
+                foreach (Match match in matches)
+                    if (match.Groups.Count > 1) {
+                        var domainInSan = match.Groups[1].Value.Trim();
+                        _logger.Debug($"Found SAN DNS Name: '{domainInSan}'");
+                        if (!string.IsNullOrEmpty(domainInSan)) domainsFoundInCert.Add(domainInSan);
+                    }
+
+                _logger.Debug("Finished parsing SAN DNS names via Regex.");
+            }
+            catch (Exception ex) {
+                _logger.Error(ex);
+                return false;
             }
         }
+        else {
+            _logger.Debug("Certificate has no SAN extension.");
+        }
 
-        _logger.Info("Certificate domain validation successful.");
-        return true;
+        _logger.Debug($"Domains found in certificate (CN + SAN DNS): {{{string.Join(", ", domainsFoundInCert)}}}");
+        
+        var allRequiredFound = true;
+        var missingDomains = new List<string>();
+
+        foreach (var requiredDomain in requiredDomainsSet)
+            if (!domainsFoundInCert.Contains(requiredDomain)) {
+                _logger.Warn($"Required domain '{requiredDomain}' was NOT found in the certificate.");
+                allRequiredFound = false;
+                missingDomains.Add(requiredDomain);
+            }
+            else {
+                _logger.Debug($"Required domain '{requiredDomain}' was found in the certificate.");
+            }
+        
+        if (allRequiredFound) {
+            _logger.Info("Validation successful: Certificate contains ALL required domains.");
+            return true;
+        }
+        else {
+            _logger.Warn($"Validation failed: Certificate is missing the following required domains: {string.Join(", ", missingDomains)}");
+            return false;
+        }
     }
 }
