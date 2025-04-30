@@ -16,7 +16,7 @@ jobs:
     
     strategy:
       matrix:
-        runtimeIdentifier: [ linux-x64, linux-arm, linux-arm64, linux-musl-x64, linux-musl-arm64 ]
+        runtimeIdentifier: [ linux-x64, linux-arm, linux-arm64, linux-musl-x64, linux-musl-arm64, windows-x64 ]
 
     steps:
     - uses: actions/checkout@v4
